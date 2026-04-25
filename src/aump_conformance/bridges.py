@@ -78,7 +78,7 @@ def _validate_a2a_message(payload: dict[str, Any]) -> tuple[bool, list[str]]:
 
 
 def _validate_ucp_reference(payload: dict[str, Any]) -> tuple[bool, list[str]]:
-    aump = payload.get("aump")
+    aump = _find_ucp_aump_ref(payload)
     if not isinstance(aump, dict):
         return False, ["missing aump reference object"]
 
@@ -89,6 +89,16 @@ def _validate_ucp_reference(payload: dict[str, Any]) -> tuple[bool, list[str]]:
         if not aump.get(field):
             errors.append(f"missing aump.{field}")
     return not errors, errors
+
+
+def _find_ucp_aump_ref(payload: dict[str, Any]) -> dict[str, Any] | None:
+    aump = payload.get("aump")
+    if isinstance(aump, dict):
+        return aump
+    meta = payload.get("meta")
+    if isinstance(meta, dict) and isinstance(meta.get("aump"), dict):
+        return meta["aump"]
+    return None
 
 
 def _find_first_meta(value: Any) -> dict[str, Any] | None:
