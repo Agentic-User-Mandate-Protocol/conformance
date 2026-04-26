@@ -17,6 +17,8 @@ The current v0.1 suite covers:
 - MCP metadata and tool annotation bridge checks.
 - A2A Agent Card, extension activation, and message metadata bridge checks.
 - UCP/AP2 reference boundary checks that prevent full private mandate leakage.
+- Evidence event schema checks and runtime evidence semantics for mandate
+  matching, retention, and private-field leakage.
 
 The fixtures are pinned to the AUMP spec snapshot in
 `fixtures/spec-snapshot.json`.
@@ -38,7 +40,7 @@ Expected result:
 
 ```text
 AUMP v0.1 conformance v0.1.0 (spec 0.1.0)
-24/24 passed
+29/29 passed
 ```
 
 ## Report Formats

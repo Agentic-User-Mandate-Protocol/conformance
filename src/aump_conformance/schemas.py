@@ -15,6 +15,7 @@ SCHEMA_FILES = {
     "mandate": "mandate.schema.json",
     "profile": "profile.schema.json",
     "action-evaluation": "action-evaluation.schema.json",
+    "evidence-event": "evidence-event.schema.json",
 }
 
 

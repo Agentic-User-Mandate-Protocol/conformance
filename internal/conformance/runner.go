@@ -1,6 +1,7 @@
 package conformance
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -75,6 +76,8 @@ func runCase(c Case, root string, schemas *SchemaRegistry, now time.Time) CaseRe
 		return runMandateCase(c, root, schemas, now)
 	case "action":
 		return runActionCase(c, root, schemas, now)
+	case "evidence":
+		return runEvidenceCase(c, root, schemas, now)
 	case "bridge":
 		return runBridgeCase(c, root)
 	default:
@@ -89,6 +92,105 @@ func runCase(c Case, root string, schemas *SchemaRegistry, now time.Time) CaseRe
 			Details:  map[string]any{},
 		}
 	}
+}
+
+func runEvidenceCase(c Case, root string, schemas *SchemaRegistry, now time.Time) CaseResult {
+	mandate, mandateErr := loadJSONObject(filepath.Join(root, c.Mandate))
+	event, eventErr := loadJSONObject(filepath.Join(root, c.Path))
+	schemaErrors := []string{}
+	if mandateErr != nil {
+		schemaErrors = append(schemaErrors, mandateErr.Error())
+	}
+	if eventErr != nil {
+		schemaErrors = append(schemaErrors, eventErr.Error())
+	}
+	if len(schemaErrors) == 0 {
+		schemaErrors = append(schemaErrors, schemas.Validate("mandate", mandate)...)
+		schemaErrors = append(schemaErrors, schemas.Validate("evidence-event", event)...)
+	}
+
+	actual := "valid"
+	reasons := []string{}
+	paths := []string{}
+	message := joinMessages(schemaErrors)
+	if len(schemaErrors) > 0 {
+		actual = "invalid"
+		reasons = []string{"schema_invalid"}
+	} else {
+		valid, evidenceReasons, evidencePaths := validateEvidenceSemantics(mandate, event, now)
+		if !valid {
+			actual = "invalid"
+		}
+		reasons = evidenceReasons
+		paths = evidencePaths
+	}
+
+	expected := map[string]any{"validity": c.Expect, "reason_codes": c.ReasonCodes}
+	actualPayload := map[string]any{"validity": actual, "reason_codes": reasons}
+	return CaseResult{
+		ID:          c.ID,
+		Category:    "evidence",
+		Title:       c.Title,
+		Passed:      actual == c.Expect && equalStringSlices(reasons, c.ReasonCodes),
+		Expected:    expected,
+		Actual:      actualPayload,
+		Message:     message,
+		ReasonCodes: reasons,
+		Paths:       paths,
+		Details:     map[string]any{},
+	}
+}
+
+func validateEvidenceSemantics(mandate map[string]any, event map[string]any, now time.Time) (bool, []string, []string) {
+	reasons := []string{}
+	paths := []string{}
+
+	if mandateResult := validateMandateSemantics(mandate, now); !mandateResult.Valid {
+		reasons = append(reasons, mandateResult.ReasonCodes...)
+		paths = append(paths, mandateResult.Paths...)
+	}
+
+	mandateRef := getObj(event, "mandate_ref")
+	mandateIDMatches := getString(mandateRef, "id") == getString(mandate, "id")
+	if !mandateIDMatches {
+		reasons = append(reasons, "evidence_mandate_mismatch")
+		paths = append(paths, "$.mandate_ref.id")
+	}
+	if hash := getString(mandateRef, "hash"); mandateIDMatches && hash != "" && hash != hashPayload(mandate) {
+		reasons = append(reasons, "evidence_mandate_hash_mismatch")
+		paths = append(paths, "$.mandate_ref.hash")
+	}
+
+	evidencePolicy := getObj(mandate, "evidence")
+	requiredEvents := stringSet(evidencePolicy["events_required"])
+	if len(requiredEvents) > 0 && !requiredEvents[getString(event, "event_type")] {
+		reasons = append(reasons, "evidence_event_type_not_required")
+		paths = append(paths, "$.event_type")
+	}
+
+	retention := getString(evidencePolicy, "retention")
+	privacy := getObj(event, "privacy")
+	if eventRetention := getString(privacy, "retention"); retention != "" && eventRetention != retention {
+		reasons = append(reasons, "evidence_retention_mismatch")
+		paths = append(paths, "$.privacy.retention")
+	}
+	if retention != "full_transcript" && getBool(privacy, "contains_private_fields") {
+		reasons = append(reasons, "evidence_private_field_leak")
+		paths = append(paths, "$.privacy.contains_private_fields")
+	}
+
+	reasons = stableUnique(reasons)
+	paths = stableUnique(paths)
+	return len(reasons) == 0, reasons, paths
+}
+
+func hashPayload(value any) string {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(data)
+	return fmt.Sprintf("sha256-%x", sum)
 }
 
 func runSchemaCase(c Case, root string, schemas *SchemaRegistry) CaseResult {
