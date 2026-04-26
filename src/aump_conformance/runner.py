@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -59,6 +61,13 @@ def _run_case(
         )
     if category == "action":
         return _run_action_case(
+            case,
+            fixture_root=fixture_root,
+            schemas=schemas,
+            now=now,
+        )
+    if category == "evidence":
+        return _run_evidence_case(
             case,
             fixture_root=fixture_root,
             schemas=schemas,
@@ -210,6 +219,104 @@ def _run_bridge_case(case: dict[str, Any], *, fixture_root: Path) -> CaseResult:
         message="; ".join(errors),
         reason_codes=[] if valid else ["bridge_invalid"],
     )
+
+
+def _run_evidence_case(
+    case: dict[str, Any],
+    *,
+    fixture_root: Path,
+    schemas: SchemaRegistry,
+    now: datetime,
+) -> CaseResult:
+    mandate = load_json(fixture_root / case["mandate"])
+    event = load_json(fixture_root / case["path"])
+    schema_errors = schemas.validate("mandate", mandate)
+    schema_errors.extend(schemas.validate("evidence-event", event))
+    if schema_errors:
+        actual = "invalid"
+        reason_codes = ["schema_invalid"]
+        paths: list[str] = []
+        message = "; ".join(schema_errors)
+    else:
+        valid, reason_codes, paths = _validate_evidence_semantics(
+            mandate,
+            event,
+            now=now,
+        )
+        actual = "valid" if valid else "invalid"
+        message = ""
+
+    expected = case["expect"]
+    expected_reasons = case.get("reason_codes", [])
+    passed = actual == expected and _matches_reasons(reason_codes, expected_reasons)
+    return CaseResult(
+        id=case["id"],
+        category="evidence",
+        title=case.get("title", ""),
+        passed=passed,
+        expected={"validity": expected, "reason_codes": expected_reasons},
+        actual={"validity": actual, "reason_codes": reason_codes},
+        message=message,
+        reason_codes=reason_codes,
+        paths=paths,
+    )
+
+
+def _validate_evidence_semantics(
+    mandate: dict[str, Any],
+    event: dict[str, Any],
+    *,
+    now: datetime,
+) -> tuple[bool, list[str], list[str]]:
+    reason_codes: list[str] = []
+    paths: list[str] = []
+
+    mandate_valid, mandate_reasons, mandate_paths = validate_mandate_semantics(
+        mandate,
+        now=now,
+    )
+    if not mandate_valid:
+        reason_codes.extend(mandate_reasons)
+        paths.extend(mandate_paths)
+
+    mandate_ref = event.get("mandate_ref", {})
+    mandate_id_matches = mandate_ref.get("id") == mandate.get("id")
+    if not mandate_id_matches:
+        reason_codes.append("evidence_mandate_mismatch")
+        paths.append("$.mandate_ref.id")
+    if mandate_id_matches and mandate_ref.get("hash") != _hash_payload(mandate):
+        reason_codes.append("evidence_mandate_hash_mismatch")
+        paths.append("$.mandate_ref.hash")
+
+    evidence_policy = mandate.get("evidence", {})
+    required_events = set(evidence_policy.get("events_required", []))
+    if required_events and event.get("event_type") not in required_events:
+        reason_codes.append("evidence_event_type_not_required")
+        paths.append("$.event_type")
+
+    retention = evidence_policy.get("retention")
+    privacy = event.get("privacy", {})
+    if retention and privacy.get("retention") != retention:
+        reason_codes.append("evidence_retention_mismatch")
+        paths.append("$.privacy.retention")
+    if retention != "full_transcript" and privacy.get("contains_private_fields"):
+        reason_codes.append("evidence_private_field_leak")
+        paths.append("$.privacy.contains_private_fields")
+
+    return not reason_codes, _stable_unique(reason_codes), _stable_unique(paths)
+
+
+def _hash_payload(payload: dict[str, Any]) -> str:
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return f"sha256-{hashlib.sha256(encoded).hexdigest()}"
+
+
+def _stable_unique(values: list[str]) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        if value not in result:
+            result.append(value)
+    return result
 
 
 def _matches_reasons(actual: list[str], expected: list[str]) -> bool:
