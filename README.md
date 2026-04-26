@@ -33,7 +33,7 @@ Python parity runner:
 
 ```bash
 uv sync
-uv run aump-conformance validate fixtures
+uv run aump-conformance validate
 ```
 
 Expected result:
@@ -80,10 +80,13 @@ The suite maps to the levels described in the AUMP specification:
 The first CLI command is:
 
 ```bash
-aump-conformance validate ./fixtures
+aump-conformance validate
 ```
 
 The native Go runner is the primary conformance executable. The Python runner is
 kept as a parity implementation and reference for SDK authors. Future SDK repos
 can either shell out to this runner in CI or embed the fixture manifest and
 compare their own evaluator output against the expected decisions.
+
+When installed from PyPI, `aump-conformance validate` runs the bundled fixture
+corpus. Pass an explicit path to validate a local fixture directory.

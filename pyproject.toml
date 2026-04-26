@@ -5,12 +5,28 @@ description = "Conformance runner and fixture corpus for the Agentic User Mandat
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
+keywords = ["agents", "ai", "mandates", "protocol", "conformance"]
 authors = [
   { name = "Agentic User Mandate Protocol Authors" }
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Testing"
 ]
 dependencies = [
   "jsonschema>=4.23.0"
 ]
+
+[project.urls]
+Homepage = "https://usermandateprotocol.com/"
+Documentation = "https://usermandateprotocol.com/conformance/"
+Repository = "https://github.com/Agentic-User-Mandate-Protocol/conformance"
+Issues = "https://github.com/Agentic-User-Mandate-Protocol/conformance/issues"
 
 [project.scripts]
 aump-conformance = "aump_conformance.cli:main"
@@ -18,7 +34,8 @@ aump-conformance = "aump_conformance.cli:main"
 [dependency-groups]
 dev = [
   "pytest>=8.3.0",
-  "ruff>=0.14.0"
+  "ruff>=0.14.0",
+  "twine>=6.0.0"
 ]
 
 [build-system]
@@ -27,6 +44,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aump_conformance"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"fixtures" = "aump_conformance/fixtures"
 
 [tool.ruff]
 line-length = 88

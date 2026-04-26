@@ -8,6 +8,7 @@ from pathlib import Path
 
 from aump_conformance.policy import parse_datetime
 from aump_conformance.reports import render_json, render_junit, render_text
+from aump_conformance.resources import bundled_fixtures_path
 from aump_conformance.runner import run_suite
 
 
@@ -23,8 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     validate.add_argument(
         "target",
         nargs="?",
-        default="fixtures",
-        help="Fixture directory or manifest JSON path.",
+        help="Fixture directory or manifest JSON path. Defaults to bundled fixtures.",
     )
     validate.add_argument(
         "--format",
@@ -41,7 +41,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "validate":
         now = parse_datetime(args.now) if args.now else None
-        report = run_suite(Path(args.target), now=now)
+        if args.target:
+            report = run_suite(Path(args.target), now=now)
+        else:
+            with bundled_fixtures_path() as fixtures:
+                report = run_suite(fixtures, now=now)
         rendered = _render(report, args.format)
         if args.output:
             Path(args.output).write_text(rendered, encoding="utf-8")
