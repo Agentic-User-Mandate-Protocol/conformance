@@ -14,6 +14,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Test native Go runner
+        run: go test ./...
+
+      - name: Run native conformance suite
+        run: go run ./cmd/aump-conformance validate fixtures --format json --output report-go.json
+
       - name: Install uv
         uses: astral-sh/setup-uv@v8.1.0
 
@@ -32,4 +43,4 @@ jobs:
         run: uv run pytest
 
       - name: Run conformance suite
-        run: uv run aump-conformance validate fixtures --format json --output report.json
+        run: uv run aump-conformance validate fixtures --format json --output report-python.json

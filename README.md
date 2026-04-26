@@ -14,14 +14,20 @@ The current v0.1 suite covers:
 - Mandate lifecycle checks for active, inactive, and expired mandates.
 - Policy evaluation for budget, currency, authority scope, disclosure, and
   escalation decisions.
-- MCP metadata bridge checks.
-- A2A Agent Card and message metadata bridge checks.
+- MCP metadata and tool annotation bridge checks.
+- A2A Agent Card, extension activation, and message metadata bridge checks.
 - UCP/AP2 reference boundary checks that prevent full private mandate leakage.
 
 The fixtures are pinned to the AUMP spec snapshot in
 `fixtures/spec-snapshot.json`.
 
 ## Quick Start
+
+```bash
+go run ./cmd/aump-conformance validate fixtures
+```
+
+Python parity runner:
 
 ```bash
 uv sync
@@ -32,12 +38,14 @@ Expected result:
 
 ```text
 AUMP v0.1 conformance v0.1.0 (spec 0.1.0)
-22/22 passed
+24/24 passed
 ```
 
 ## Report Formats
 
 ```bash
+go run ./cmd/aump-conformance validate fixtures --format json --output report.json
+go run ./cmd/aump-conformance validate fixtures --format junit --output junit.xml
 uv run aump-conformance validate fixtures --format json --output report.json
 uv run aump-conformance validate fixtures --format junit --output junit.xml
 ```
@@ -73,5 +81,7 @@ The first CLI command is:
 aump-conformance validate ./fixtures
 ```
 
-Future SDK repos can either shell out to this runner in CI or embed the fixture
-manifest and compare their own evaluator output against the expected decisions.
+The native Go runner is the primary conformance executable. The Python runner is
+kept as a parity implementation and reference for SDK authors. Future SDK repos
+can either shell out to this runner in CI or embed the fixture manifest and
+compare their own evaluator output against the expected decisions.
