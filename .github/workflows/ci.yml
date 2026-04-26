@@ -43,4 +43,16 @@ jobs:
         run: uv run pytest
 
       - name: Run conformance suite
-        run: uv run aump-conformance validate fixtures --format json --output report-python.json
+        run: uv run aump-conformance validate --format json --output report-python.json
+
+      - name: Build Python package
+        run: uv build
+
+      - name: Check Python package
+        run: uv run twine check dist/*
+
+      - name: Smoke install Python package
+        run: |
+          python -m venv /tmp/aump-conformance-smoke
+          /tmp/aump-conformance-smoke/bin/python -m pip install dist/*.whl
+          /tmp/aump-conformance-smoke/bin/aump-conformance validate
